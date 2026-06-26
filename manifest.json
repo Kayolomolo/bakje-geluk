@@ -1,0 +1,17 @@
+{
+  "name": "Bakje Geluk",
+  "short_name": "Bakje Geluk",
+  "description": "Eet jezelf lekker in je vel — weekmenu planner",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#fafaf7",
+  "theme_color": "#e8734a",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "224x225",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
