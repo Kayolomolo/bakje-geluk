@@ -16,6 +16,111 @@ const sampleRecipes = [
     { id: '10', name: 'Yoghurt met granola', category: 'ontbijt', time: 5, servings: 1, ingredients: '200g Griekse yoghurt\n40g granola\n1 el honing\nVers fruit naar keuze', instructions: 'Schep yoghurt in een kom, voeg granola en fruit toe en besprenkel met honing.', cal: 280, protein: 18, carbs: 34, fat: 8 }
 ];
 
+// SYNC via jsonblob.com
+const BLOB_API = 'https://jsonblob.com/api/jsonBlob';
+let blobId = null;
+let syncTimer = null;
+let isSyncing = false;
+
+function getBlobIdFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('id');
+}
+
+function updateUrl(id) {
+    const url = new URL(window.location);
+    url.searchParams.set('id', id);
+    window.history.replaceState({}, '', url);
+}
+
+function showSyncStatus(msg, type = 'info') {
+    const el = document.getElementById('syncStatus');
+    el.textContent = msg;
+    el.className = 'sync-status sync-' + type;
+    el.style.display = 'block';
+    if (type !== 'error') {
+        setTimeout(() => { el.style.display = 'none'; }, 2500);
+    }
+}
+
+async function createBlob() {
+    try {
+        showSyncStatus('Nieuw menu aanmaken...', 'info');
+        const res = await fetch(BLOB_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(getSaveData())
+        });
+        if (!res.ok) throw new Error('Aanmaken mislukt');
+        const loc = res.headers.get('Location') || res.headers.get('location');
+        blobId = loc.split('/').pop();
+        updateUrl(blobId);
+        showSyncStatus('Menu aangemaakt! Deel de link.', 'success');
+        renderShareBar();
+    } catch (e) {
+        showSyncStatus('Kon geen online opslag aanmaken. Data wordt lokaal opgeslagen.', 'error');
+    }
+}
+
+async function loadBlob(id) {
+    try {
+        showSyncStatus('Menu laden...', 'info');
+        const res = await fetch(`${BLOB_API}/${id}`);
+        if (!res.ok) throw new Error('Laden mislukt');
+        const data = await res.json();
+        state.recipes = data.recipes || sampleRecipes;
+        state.weekmenu = data.weekmenu || {};
+        state.shoppingList = data.shoppingList || [];
+        blobId = id;
+        updateUrl(blobId);
+        showSyncStatus('Menu geladen!', 'success');
+        renderShareBar();
+        renderAll();
+    } catch (e) {
+        showSyncStatus('Link niet gevonden. Nieuw menu gestart.', 'error');
+        loadLocal();
+        renderAll();
+    }
+}
+
+async function saveBlob() {
+    if (!blobId || isSyncing) return;
+    isSyncing = true;
+    try {
+        await fetch(`${BLOB_API}/${blobId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(getSaveData())
+        });
+    } catch (e) {
+        // silent fail, local backup exists
+    }
+    isSyncing = false;
+}
+
+async function refreshFromBlob() {
+    if (!blobId) return;
+    try {
+        const res = await fetch(`${BLOB_API}/${blobId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        state.recipes = data.recipes || [];
+        state.weekmenu = data.weekmenu || {};
+        state.shoppingList = data.shoppingList || [];
+        renderAll();
+    } catch (e) {
+        // silent
+    }
+}
+
+function getSaveData() {
+    return {
+        recipes: state.recipes,
+        weekmenu: state.weekmenu,
+        shoppingList: state.shoppingList
+    };
+}
+
 // State
 let state = {
     recipes: [],
@@ -26,17 +131,24 @@ let state = {
     pickingMeal: null
 };
 
-function load() {
+function loadLocal() {
     const saved = localStorage.getItem('bakje-geluk');
     if (saved) {
-        state = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        state.recipes = parsed.recipes || sampleRecipes;
+        state.weekmenu = parsed.weekmenu || {};
+        state.shoppingList = parsed.shoppingList || [];
     } else {
         state.recipes = sampleRecipes;
     }
 }
 
 function save() {
-    localStorage.setItem('bakje-geluk', JSON.stringify(state));
+    localStorage.setItem('bakje-geluk', JSON.stringify(getSaveData()));
+    if (blobId) {
+        clearTimeout(syncTimer);
+        syncTimer = setTimeout(saveBlob, 1000);
+    }
 }
 
 function getWeekKey() {
@@ -49,6 +161,41 @@ function getWeekMenu() {
         state.weekmenu[key] = {};
     }
     return state.weekmenu[key];
+}
+
+function renderShareBar() {
+    const bar = document.getElementById('shareBar');
+    if (blobId) {
+        const shareUrl = `${window.location.origin}${window.location.pathname}?id=${blobId}`;
+        bar.innerHTML = `
+            <div class="share-active">
+                <span>Online opslag actief</span>
+                <button class="btn btn-sm" onclick="copyShareLink()">Link kopiëren</button>
+                <button class="btn btn-sm" onclick="refreshFromBlob()">Ververs data</button>
+            </div>
+        `;
+    } else {
+        bar.innerHTML = `
+            <div class="share-inactive">
+                <span>Alleen lokaal opgeslagen</span>
+                <button class="btn btn-sm btn-primary" onclick="createBlob()">Online zetten (deelbare link)</button>
+            </div>
+        `;
+    }
+}
+
+window.copyShareLink = function() {
+    const shareUrl = `${window.location.origin}${window.location.pathname}?id=${blobId}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+        showSyncStatus('Link gekopieerd!', 'success');
+    }).catch(() => {
+        prompt('Kopieer deze link:', shareUrl);
+    });
+};
+
+function renderAll() {
+    renderWeekMenu();
+    renderRecipes();
 }
 
 // Navigation
@@ -397,6 +544,15 @@ function renderBar(label, value, target, unit, type) {
 }
 
 // INIT
-load();
-renderWeekMenu();
-renderRecipes();
+async function init() {
+    const urlId = getBlobIdFromUrl();
+    if (urlId) {
+        await loadBlob(urlId);
+    } else {
+        loadLocal();
+        renderAll();
+    }
+    renderShareBar();
+}
+
+init();
