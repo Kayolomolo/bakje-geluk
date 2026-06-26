@@ -736,7 +736,7 @@ body {
     margin-bottom: 20px;
 }
 
-.share-active, .share-inactive {
+.share-bar-content {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -744,17 +744,8 @@ body {
     border-radius: var(--radius);
     font-size: 0.88rem;
     flex-wrap: wrap;
-}
-
-.share-active {
-    background: var(--green-light);
-    color: #3a8a39;
-    font-weight: 700;
-}
-
-.share-inactive {
-    background: var(--yellow-light);
-    color: #8a7a20;
+    background: var(--blue-light);
+    color: #3a6fa5;
     font-weight: 600;
 }
 

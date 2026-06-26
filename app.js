@@ -16,21 +16,15 @@ const sampleRecipes = [
     { id: '10', name: 'Yoghurt met granola', category: 'ontbijt', time: 5, servings: 1, ingredients: '200g Griekse yoghurt\n40g granola\n1 el honing\nVers fruit naar keuze', instructions: 'Schep yoghurt in een kom, voeg granola en fruit toe en besprenkel met honing.', cal: 280, protein: 18, carbs: 34, fat: 8 }
 ];
 
-// SYNC via jsonblob.com
-const BLOB_API = 'https://jsonblob.com/api/jsonBlob';
-let blobId = null;
-let syncTimer = null;
-let isSyncing = false;
-
-function getBlobIdFromUrl() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('id');
+// COMPRESS/DECOMPRESS for URL sharing
+function compressData(data) {
+    const json = JSON.stringify(data);
+    return btoa(unescape(encodeURIComponent(json)));
 }
 
-function updateUrl(id) {
-    const url = new URL(window.location);
-    url.searchParams.set('id', id);
-    window.history.replaceState({}, '', url);
+function decompressData(str) {
+    const json = decodeURIComponent(escape(atob(str)));
+    return JSON.parse(json);
 }
 
 function showSyncStatus(msg, type = 'info') {
@@ -39,86 +33,8 @@ function showSyncStatus(msg, type = 'info') {
     el.className = 'sync-status sync-' + type;
     el.style.display = 'block';
     if (type !== 'error') {
-        setTimeout(() => { el.style.display = 'none'; }, 2500);
+        setTimeout(() => { el.style.display = 'none'; }, 3000);
     }
-}
-
-async function createBlob() {
-    try {
-        showSyncStatus('Nieuw menu aanmaken...', 'info');
-        const res = await fetch(BLOB_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(getSaveData())
-        });
-        if (!res.ok) throw new Error('Aanmaken mislukt');
-        const loc = res.headers.get('Location') || res.headers.get('location');
-        blobId = loc.split('/').pop();
-        updateUrl(blobId);
-        showSyncStatus('Menu aangemaakt! Deel de link.', 'success');
-        renderShareBar();
-    } catch (e) {
-        showSyncStatus('Kon geen online opslag aanmaken. Data wordt lokaal opgeslagen.', 'error');
-    }
-}
-
-async function loadBlob(id) {
-    try {
-        showSyncStatus('Menu laden...', 'info');
-        const res = await fetch(`${BLOB_API}/${id}`);
-        if (!res.ok) throw new Error('Laden mislukt');
-        const data = await res.json();
-        state.recipes = data.recipes || sampleRecipes;
-        state.weekmenu = data.weekmenu || {};
-        state.shoppingList = data.shoppingList || [];
-        blobId = id;
-        updateUrl(blobId);
-        showSyncStatus('Menu geladen!', 'success');
-        renderShareBar();
-        renderAll();
-    } catch (e) {
-        showSyncStatus('Link niet gevonden. Nieuw menu gestart.', 'error');
-        loadLocal();
-        renderAll();
-    }
-}
-
-async function saveBlob() {
-    if (!blobId || isSyncing) return;
-    isSyncing = true;
-    try {
-        await fetch(`${BLOB_API}/${blobId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(getSaveData())
-        });
-    } catch (e) {
-        // silent fail, local backup exists
-    }
-    isSyncing = false;
-}
-
-async function refreshFromBlob() {
-    if (!blobId) return;
-    try {
-        const res = await fetch(`${BLOB_API}/${blobId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        state.recipes = data.recipes || [];
-        state.weekmenu = data.weekmenu || {};
-        state.shoppingList = data.shoppingList || [];
-        renderAll();
-    } catch (e) {
-        // silent
-    }
-}
-
-function getSaveData() {
-    return {
-        recipes: state.recipes,
-        weekmenu: state.weekmenu,
-        shoppingList: state.shoppingList
-    };
 }
 
 // State
@@ -131,6 +47,31 @@ let state = {
     pickingMeal: null
 };
 
+function getSaveData() {
+    return {
+        recipes: state.recipes,
+        weekmenu: state.weekmenu,
+        shoppingList: state.shoppingList
+    };
+}
+
+function loadFromUrl() {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return false;
+    try {
+        const data = decompressData(hash);
+        state.recipes = data.recipes || sampleRecipes;
+        state.weekmenu = data.weekmenu || {};
+        state.shoppingList = data.shoppingList || [];
+        localStorage.setItem('bakje-geluk', JSON.stringify(getSaveData()));
+        window.history.replaceState({}, '', window.location.pathname);
+        showSyncStatus('Menu geladen vanuit gedeelde link!', 'success');
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 function loadLocal() {
     const saved = localStorage.getItem('bakje-geluk');
     if (saved) {
@@ -139,16 +80,12 @@ function loadLocal() {
         state.weekmenu = parsed.weekmenu || {};
         state.shoppingList = parsed.shoppingList || [];
     } else {
-        state.recipes = sampleRecipes;
+        state.recipes = [...sampleRecipes];
     }
 }
 
 function save() {
     localStorage.setItem('bakje-geluk', JSON.stringify(getSaveData()));
-    if (blobId) {
-        clearTimeout(syncTimer);
-        syncTimer = setTimeout(saveBlob, 1000);
-    }
 }
 
 function getWeekKey() {
@@ -163,35 +100,41 @@ function getWeekMenu() {
     return state.weekmenu[key];
 }
 
-function renderShareBar() {
-    const bar = document.getElementById('shareBar');
-    if (blobId) {
-        const shareUrl = `${window.location.origin}${window.location.pathname}?id=${blobId}`;
-        bar.innerHTML = `
-            <div class="share-active">
-                <span>Online opslag actief</span>
-                <button class="btn btn-sm" onclick="copyShareLink()">Link kopiëren</button>
-                <button class="btn btn-sm" onclick="refreshFromBlob()">Ververs data</button>
-            </div>
-        `;
-    } else {
-        bar.innerHTML = `
-            <div class="share-inactive">
-                <span>Alleen lokaal opgeslagen</span>
-                <button class="btn btn-sm btn-primary" onclick="createBlob()">Online zetten (deelbare link)</button>
-            </div>
-        `;
+window.shareLink = function() {
+    const data = compressData(getSaveData());
+    const url = `${window.location.origin}${window.location.pathname}#${data}`;
+
+    if (url.length > 50000) {
+        showSyncStatus('Te veel data om te delen via link. Verwijder oude weken.', 'error');
+        return;
     }
+
+    if (navigator.share) {
+        navigator.share({ title: 'Bakje Geluk - Weekmenu', url }).catch(() => {
+            copyToClipboard(url);
+        });
+    } else {
+        copyToClipboard(url);
+    }
+};
+
+function copyToClipboard(url) {
+    navigator.clipboard.writeText(url).then(() => {
+        showSyncStatus('Link gekopieerd! Stuur naar je telefoon.', 'success');
+    }).catch(() => {
+        prompt('Kopieer deze link:', url);
+    });
 }
 
-window.copyShareLink = function() {
-    const shareUrl = `${window.location.origin}${window.location.pathname}?id=${blobId}`;
-    navigator.clipboard.writeText(shareUrl).then(() => {
-        showSyncStatus('Link gekopieerd!', 'success');
-    }).catch(() => {
-        prompt('Kopieer deze link:', shareUrl);
-    });
-};
+function renderShareBar() {
+    const bar = document.getElementById('shareBar');
+    bar.innerHTML = `
+        <div class="share-bar-content">
+            <span>📲 Wil je dit menu op een ander apparaat bekijken?</span>
+            <button class="btn btn-sm btn-primary" onclick="shareLink()">Deel link</button>
+        </div>
+    `;
+}
 
 function renderAll() {
     renderWeekMenu();
@@ -544,15 +487,12 @@ function renderBar(label, value, target, unit, type) {
 }
 
 // INIT
-async function init() {
-    const urlId = getBlobIdFromUrl();
-    if (urlId) {
-        await loadBlob(urlId);
-    } else {
+function init() {
+    if (!loadFromUrl()) {
         loadLocal();
-        renderAll();
     }
     renderShareBar();
+    renderAll();
 }
 
 init();
