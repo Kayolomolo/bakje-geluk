@@ -51,16 +51,12 @@ body {
     margin-bottom: 32px;
 }
 
-.logo-icon {
-    font-size: 40px;
-    display: block;
-    margin-bottom: 4px;
-}
-
-.logo h1 {
-    font-size: 1.4rem;
-    font-weight: 800;
-    color: var(--primary);
+.logo-img {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 6px;
 }
 
 .tagline {
