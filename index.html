@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bakje Geluk — Eet jezelf lekker in je vel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="sidebar" id="sidebar">
+        <div class="logo">
+            <span class="logo-icon">🥣</span>
+            <h1>Bakje Geluk</h1>
+            <p class="tagline">Eet jezelf lekker in je vel</p>
+        </div>
+        <ul class="nav-links">
+            <li><a href="#" class="nav-link active" data-page="weekmenu"><span class="nav-icon">📅</span> Weekmenu</a></li>
+            <li><a href="#" class="nav-link" data-page="recepten"><span class="nav-icon">📖</span> Recepten</a></li>
+            <li><a href="#" class="nav-link" data-page="boodschappen"><span class="nav-icon">🛒</span> Boodschappenlijst</a></li>
+            <li><a href="#" class="nav-link" data-page="voeding"><span class="nav-icon">🥗</span> Voedingswaarden</a></li>
+        </ul>
+    </nav>
+
+    <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+
+    <main class="content">
+        <!-- WEEKMENU PAGE -->
+        <section class="page active" id="page-weekmenu">
+            <div class="page-header">
+                <h2>Weekmenu</h2>
+                <div class="week-nav">
+                    <button class="btn btn-icon" id="prevWeek">◀</button>
+                    <span id="weekLabel">Deze week</span>
+                    <button class="btn btn-icon" id="nextWeek">▶</button>
+                </div>
+            </div>
+            <div class="weekmenu-grid" id="weekmenuGrid"></div>
+        </section>
+
+        <!-- RECEPTEN PAGE -->
+        <section class="page" id="page-recepten">
+            <div class="page-header">
+                <h2>Recepten</h2>
+                <button class="btn btn-primary" id="addRecipeBtn">+ Nieuw recept</button>
+            </div>
+            <div class="search-bar">
+                <input type="text" id="recipeSearch" placeholder="Zoek een recept...">
+                <div class="filter-tags" id="filterTags"></div>
+            </div>
+            <div class="recipe-grid" id="recipeGrid"></div>
+        </section>
+
+        <!-- BOODSCHAPPEN PAGE -->
+        <section class="page" id="page-boodschappen">
+            <div class="page-header">
+                <h2>Boodschappenlijst</h2>
+                <button class="btn btn-primary" id="generateListBtn">🔄 Genereer uit weekmenu</button>
+            </div>
+            <div class="shopping-list" id="shoppingList"></div>
+            <div class="shopping-add">
+                <input type="text" id="addItemInput" placeholder="Voeg item toe...">
+                <button class="btn btn-primary" id="addItemBtn">+</button>
+            </div>
+        </section>
+
+        <!-- VOEDING PAGE -->
+        <section class="page" id="page-voeding">
+            <div class="page-header">
+                <h2>Voedingswaarden</h2>
+            </div>
+            <div class="nutrition-overview" id="nutritionOverview"></div>
+        </section>
+    </main>
+
+    <!-- RECIPE MODAL -->
+    <div class="modal-overlay" id="recipeModal">
+        <div class="modal">
+            <button class="modal-close" id="closeModal">✕</button>
+            <h2 id="modalTitle">Nieuw recept</h2>
+            <form id="recipeForm">
+                <div class="form-group">
+                    <label>Naam</label>
+                    <input type="text" id="recipeName" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Categorie</label>
+                        <select id="recipeCategory">
+                            <option value="ontbijt">Ontbijt</option>
+                            <option value="lunch">Lunch</option>
+                            <option value="diner" selected>Diner</option>
+                            <option value="snack">Snack</option>
+                            <option value="dessert">Dessert</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Bereidingstijd (min)</label>
+                        <input type="number" id="recipeTime" min="1" value="30">
+                    </div>
+                    <div class="form-group">
+                        <label>Porties</label>
+                        <input type="number" id="recipeServings" min="1" value="4">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Ingrediënten <small>(één per regel: hoeveelheid + ingrediënt)</small></label>
+                    <textarea id="recipeIngredients" rows="6" placeholder="200g kipfilet&#10;1 ui&#10;2 teentjes knoflook&#10;400g rijst"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Bereiding</label>
+                    <textarea id="recipeInstructions" rows="5" placeholder="Beschrijf de bereidingsstappen..."></textarea>
+                </div>
+                <h3>Voedingswaarden <small>(per portie)</small></h3>
+                <div class="form-row nutrition-row">
+                    <div class="form-group">
+                        <label>Calorieën</label>
+                        <input type="number" id="recipeCal" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Eiwitten (g)</label>
+                        <input type="number" id="recipeProtein" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Koolhydraten (g)</label>
+                        <input type="number" id="recipeCarbs" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Vetten (g)</label>
+                        <input type="number" id="recipeFat" min="0" value="0">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn" id="cancelRecipe">Annuleren</button>
+                    <button type="submit" class="btn btn-primary">Opslaan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MEAL PICKER MODAL -->
+    <div class="modal-overlay" id="mealPickerModal">
+        <div class="modal modal-sm">
+            <button class="modal-close" id="closeMealPicker">✕</button>
+            <h2>Kies een recept</h2>
+            <input type="text" id="mealPickerSearch" placeholder="Zoek recept..." class="meal-picker-search">
+            <div class="meal-picker-list" id="mealPickerList"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
