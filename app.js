@@ -3,6 +3,16 @@ const MEALS = ['ontbijt', 'snack1', 'lunch', 'snack2', 'diner', 'snack3'];
 const CATEGORIES = ['ontbijt', 'lunch', 'diner', 'snack', 'dessert'];
 const MEAL_LABELS = { ontbijt: 'Ontbijt', snack1: 'Snack', lunch: 'Lunch', snack2: 'Snack', diner: 'Diner', snack3: 'Snack' };
 
+const SUPABASE_URL = 'https://oedetwodrmyuctpgeozu.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_FvjrjHaXMW9DKtwFbxRVxw_N1UhF5DN';
+const API_URL = `${SUPABASE_URL}/rest/v1/menu_data`;
+const API_HEADERS = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=minimal'
+};
+
 const sampleRecipes = [
     { id: '1', name: 'Havermout met fruit', category: 'ontbijt', time: 10, servings: 2, ingredients: '80g havermout\n300ml melk\n1 banaan\nHandje blauwe bessen\n1 el honing', instructions: 'Kook de havermout met melk. Snijd de banaan en leg bovenop met bessen en honing.', cal: 320, protein: 12, carbs: 52, fat: 8 },
     { id: '2', name: 'Broodje avocado-ei', category: 'lunch', time: 15, servings: 2, ingredients: '4 sneetjes volkorenbrood\n2 avocado\'s\n2 eieren\nSnufje peper en zout\nChilivlokken', instructions: 'Toast het brood. Prak de avocado en smeer op het brood. Bak de eieren en leg erop. Breng op smaak.', cal: 420, protein: 16, carbs: 38, fat: 24 },
@@ -16,27 +26,6 @@ const sampleRecipes = [
     { id: '10', name: 'Yoghurt met granola', category: 'ontbijt', time: 5, servings: 1, ingredients: '200g Griekse yoghurt\n40g granola\n1 el honing\nVers fruit naar keuze', instructions: 'Schep yoghurt in een kom, voeg granola en fruit toe en besprenkel met honing.', cal: 280, protein: 18, carbs: 34, fat: 8 }
 ];
 
-// COMPRESS/DECOMPRESS for URL sharing
-function compressData(data) {
-    const json = JSON.stringify(data);
-    return btoa(unescape(encodeURIComponent(json)));
-}
-
-function decompressData(str) {
-    const json = decodeURIComponent(escape(atob(str)));
-    return JSON.parse(json);
-}
-
-function showSyncStatus(msg, type = 'info') {
-    const el = document.getElementById('syncStatus');
-    el.textContent = msg;
-    el.className = 'sync-status sync-' + type;
-    el.style.display = 'block';
-    if (type !== 'error') {
-        setTimeout(() => { el.style.display = 'none'; }, 3000);
-    }
-}
-
 // State
 let state = {
     recipes: [],
@@ -47,6 +36,9 @@ let state = {
     pickingMeal: null
 };
 
+let syncTimer = null;
+let isSyncing = false;
+
 function getSaveData() {
     return {
         recipes: state.recipes,
@@ -55,21 +47,55 @@ function getSaveData() {
     };
 }
 
-function loadFromUrl() {
-    const hash = window.location.hash.slice(1);
-    if (!hash) return false;
+function showSyncStatus(msg, type = 'info') {
+    const el = document.getElementById('syncStatus');
+    el.textContent = msg;
+    el.className = 'sync-status sync-' + type;
+    el.style.display = 'block';
+    if (type !== 'error') {
+        setTimeout(() => { el.style.display = 'none'; }, 2500);
+    }
+}
+
+// SUPABASE SYNC
+async function loadFromCloud() {
     try {
-        const data = decompressData(hash);
-        state.recipes = data.recipes || sampleRecipes;
-        state.weekmenu = data.weekmenu || {};
-        state.shoppingList = data.shoppingList || [];
-        localStorage.setItem('bakje-geluk', JSON.stringify(getSaveData()));
-        window.history.replaceState({}, '', window.location.pathname);
-        showSyncStatus('Menu geladen vanuit gedeelde link!', 'success');
-        return true;
+        const res = await fetch(`${API_URL}?id=eq.main&select=content`, {
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        if (!res.ok) throw new Error('Laden mislukt');
+        const rows = await res.json();
+        if (rows.length && rows[0].content && rows[0].content.recipes) {
+            const data = rows[0].content;
+            state.recipes = data.recipes;
+            state.weekmenu = data.weekmenu || {};
+            state.shoppingList = data.shoppingList || [];
+            showSyncStatus('Gesynchroniseerd', 'success');
+            return true;
+        }
+        return false;
     } catch (e) {
+        showSyncStatus('Offline modus — data wordt lokaal opgeslagen', 'error');
         return false;
     }
+}
+
+async function saveToCloud() {
+    if (isSyncing) return;
+    isSyncing = true;
+    try {
+        await fetch(`${API_URL}?id=eq.main`, {
+            method: 'PATCH',
+            headers: API_HEADERS,
+            body: JSON.stringify({
+                content: getSaveData(),
+                updated_at: new Date().toISOString()
+            })
+        });
+    } catch (e) {
+        // silent fail, local backup
+    }
+    isSyncing = false;
 }
 
 function loadLocal() {
@@ -86,6 +112,8 @@ function loadLocal() {
 
 function save() {
     localStorage.setItem('bakje-geluk', JSON.stringify(getSaveData()));
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(saveToCloud, 1000);
 }
 
 function getWeekKey() {
@@ -100,38 +128,11 @@ function getWeekMenu() {
     return state.weekmenu[key];
 }
 
-window.shareLink = function() {
-    const data = compressData(getSaveData());
-    const url = `${window.location.origin}${window.location.pathname}#${data}`;
-
-    if (url.length > 50000) {
-        showSyncStatus('Te veel data om te delen via link. Verwijder oude weken.', 'error');
-        return;
-    }
-
-    if (navigator.share) {
-        navigator.share({ title: 'Bakje Geluk - Weekmenu', url }).catch(() => {
-            copyToClipboard(url);
-        });
-    } else {
-        copyToClipboard(url);
-    }
-};
-
-function copyToClipboard(url) {
-    navigator.clipboard.writeText(url).then(() => {
-        showSyncStatus('Link gekopieerd! Stuur naar je telefoon.', 'success');
-    }).catch(() => {
-        prompt('Kopieer deze link:', url);
-    });
-}
-
-function renderShareBar() {
+function renderSyncBar() {
     const bar = document.getElementById('shareBar');
     bar.innerHTML = `
         <div class="share-bar-content">
-            <span>📲 Wil je dit menu op een ander apparaat bekijken?</span>
-            <button class="btn btn-sm btn-primary" onclick="shareLink()">Deel link</button>
+            <span>☁️ Automatische sync actief — werkt op al je apparaten</span>
         </div>
     `;
 }
@@ -140,6 +141,22 @@ function renderAll() {
     renderWeekMenu();
     renderRecipes();
 }
+
+// Auto-refresh elke 30 seconden
+setInterval(async () => {
+    if (document.visibilityState === 'visible' && !isSyncing) {
+        const loaded = await loadFromCloud();
+        if (loaded) renderAll();
+    }
+}, 30000);
+
+// Refresh bij terugkomen naar tabblad
+document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible') {
+        const loaded = await loadFromCloud();
+        if (loaded) renderAll();
+    }
+});
 
 // Navigation
 document.querySelectorAll('.nav-link').forEach(link => {
@@ -487,12 +504,18 @@ function renderBar(label, value, target, unit, type) {
 }
 
 // INIT
-function init() {
-    if (!loadFromUrl()) {
-        loadLocal();
-    }
-    renderShareBar();
+async function init() {
+    loadLocal();
+    renderSyncBar();
     renderAll();
+
+    const cloudLoaded = await loadFromCloud();
+    if (cloudLoaded) {
+        localStorage.setItem('bakje-geluk', JSON.stringify(getSaveData()));
+        renderAll();
+    } else if (state.recipes.length > 0) {
+        saveToCloud();
+    }
 }
 
 init();
