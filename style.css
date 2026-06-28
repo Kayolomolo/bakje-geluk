@@ -222,10 +222,36 @@ body {
     border-top: 4px solid var(--primary);
 }
 
+.day-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
 .day-card h3 {
     font-size: 1rem;
-    margin-bottom: 12px;
     color: var(--primary);
+}
+
+.day-card-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.btn-day {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 2px 4px;
+    border-radius: 6px;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.btn-day:hover {
+    opacity: 1;
 }
 
 .meal-slot {

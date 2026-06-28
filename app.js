@@ -187,7 +187,13 @@ function renderWeekMenu() {
     grid.innerHTML = DAYS.map(day => {
         const dayMenu = menu[day] || {};
         return `<div class="day-card">
-            <h3>${day}</h3>
+            <div class="day-card-header">
+                <h3>${day}</h3>
+                <div class="day-card-actions">
+                    <button class="btn-day" onclick="copyDay('${day}')" title="Kopieer deze dag">📋</button>
+                    <button class="btn-day" onclick="pasteDay('${day}')" title="Plak hier" id="paste-${day}" style="display:none">📌</button>
+                </div>
+            </div>
             ${MEALS.map(meal => {
                 const recipe = dayMenu[meal];
                 const entry = dayMenu[meal];
@@ -249,6 +255,28 @@ window.selectMeal = function(recipeId) {
     save();
     document.getElementById('mealPickerModal').classList.remove('open');
     renderWeekMenu();
+};
+
+let copiedDay = null;
+
+window.copyDay = function(day) {
+    const menu = getWeekMenu();
+    copiedDay = JSON.parse(JSON.stringify(menu[day] || {}));
+    DAYS.forEach(d => {
+        const btn = document.getElementById(`paste-${d}`);
+        if (btn) btn.style.display = d !== day ? 'inline-flex' : 'none';
+    });
+    showSyncStatus(`${day} gekopieerd — kies een dag om te plakken`, 'success');
+};
+
+window.pasteDay = function(day) {
+    if (!copiedDay) return;
+    const menu = getWeekMenu();
+    menu[day] = JSON.parse(JSON.stringify(copiedDay));
+    save();
+    copiedDay = null;
+    renderWeekMenu();
+    showSyncStatus(`Menu geplakt naar ${day}`, 'success');
 };
 
 window.setCustomMeal = function(day, meal, value) {
