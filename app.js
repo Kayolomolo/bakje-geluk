@@ -197,7 +197,7 @@ function renderWeekMenu() {
                     <span class="meal-slot-label">${MEAL_LABELS[meal] || meal}</span>
                     ${hasRecipe
                         ? `<a class="meal-slot-name meal-link" href="#" onclick="event.preventDefault(); viewRecipe('${entry.id}')">${name}</a>`
-                        : `<span class="meal-slot-name ${name ? '' : 'empty'}">${name || '—'}</span>`
+                        : `<input class="meal-slot-input" type="text" value="${name}" placeholder="Typ of kies..." onfocus="this.select()" onchange="setCustomMeal('${day}', '${meal}', this.value)" />`
                     }
                     <div class="meal-slot-actions">
                         <button onclick="openMealPicker('${day}', '${meal}')" title="Kies recept">📝</button>
@@ -249,6 +249,18 @@ window.selectMeal = function(recipeId) {
     save();
     document.getElementById('mealPickerModal').classList.remove('open');
     renderWeekMenu();
+};
+
+window.setCustomMeal = function(day, meal, value) {
+    const name = value.trim();
+    const menu = getWeekMenu();
+    if (!menu[day]) menu[day] = {};
+    if (name) {
+        menu[day][meal] = { name };
+    } else {
+        delete menu[day][meal];
+    }
+    save();
 };
 
 window.selectCustomMeal = function() {
