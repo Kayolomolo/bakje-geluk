@@ -190,10 +190,15 @@ function renderWeekMenu() {
             <h3>${day}</h3>
             ${MEALS.map(meal => {
                 const recipe = dayMenu[meal];
-                const name = recipe ? recipe.name : '';
+                const entry = dayMenu[meal];
+                const name = entry ? entry.name : '';
+                const hasRecipe = entry && entry.id && state.recipes.find(r => r.id === entry.id);
                 return `<div class="meal-slot">
                     <span class="meal-slot-label">${MEAL_LABELS[meal] || meal}</span>
-                    <span class="meal-slot-name ${name ? '' : 'empty'}">${name || '—'}</span>
+                    ${hasRecipe
+                        ? `<a class="meal-slot-name meal-link" href="#" onclick="event.preventDefault(); viewRecipe('${entry.id}')">${name}</a>`
+                        : `<span class="meal-slot-name ${name ? '' : 'empty'}">${name || '—'}</span>`
+                    }
                     <div class="meal-slot-actions">
                         <button onclick="openMealPicker('${day}', '${meal}')" title="Kies recept">📝</button>
                         ${name ? `<button onclick="removeMeal('${day}', '${meal}')" title="Verwijder">✕</button>` : ''}
@@ -221,9 +226,16 @@ function renderMealPickerList(query) {
     const list = document.getElementById('mealPickerList');
     const q = query.toLowerCase();
     const filtered = state.recipes.filter(r => r.name.toLowerCase().includes(q));
-    list.innerHTML = filtered.length ? filtered.map(r =>
+    let html = filtered.map(r =>
         `<div class="meal-picker-item" onclick="selectMeal('${r.id}')">${r.name}<span class="picker-cat">${r.category}</span></div>`
-    ).join('') : '<p style="padding:20px;color:var(--text-light);text-align:center">Geen recepten gevonden</p>';
+    ).join('');
+    if (q.length > 0) {
+        html += `<div class="meal-picker-item meal-picker-custom" onclick="selectCustomMeal()">✏️ "${document.getElementById('mealPickerSearch').value}" toevoegen als vrije tekst</div>`;
+    }
+    if (!html) {
+        html = '<p style="padding:20px;color:var(--text-light);text-align:center">Typ een naam om als vrije tekst toe te voegen</p>';
+    }
+    list.innerHTML = html;
 }
 
 document.getElementById('mealPickerSearch').addEventListener('input', e => renderMealPickerList(e.target.value));
@@ -237,6 +249,28 @@ window.selectMeal = function(recipeId) {
     save();
     document.getElementById('mealPickerModal').classList.remove('open');
     renderWeekMenu();
+};
+
+window.selectCustomMeal = function() {
+    const { day, meal } = state.pickingMeal;
+    const name = document.getElementById('mealPickerSearch').value.trim();
+    if (!name) return;
+    const menu = getWeekMenu();
+    if (!menu[day]) menu[day] = {};
+    menu[day][meal] = { name };
+    save();
+    document.getElementById('mealPickerModal').classList.remove('open');
+    renderWeekMenu();
+};
+
+window.viewRecipe = function(id) {
+    const recipe = state.recipes.find(r => r.id === id);
+    if (!recipe) return;
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    document.querySelector('[data-page="recepten"]').classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-recepten').classList.add('active');
+    openRecipeModal(recipe);
 };
 
 window.removeMeal = function(day, meal) {

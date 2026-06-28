@@ -263,6 +263,16 @@ body {
     font-style: italic;
 }
 
+.meal-link {
+    color: var(--primary);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.meal-link:hover {
+    text-decoration: underline;
+}
+
 .meal-slot-actions {
     display: flex;
     gap: 4px;
@@ -708,6 +718,14 @@ body {
     font-size: 0.72rem;
     color: var(--text-light);
     margin-left: 6px;
+}
+
+.meal-picker-custom {
+    color: var(--primary);
+    font-weight: 700;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    padding-top: 12px;
 }
 
 /* SYNC & SHARE */
