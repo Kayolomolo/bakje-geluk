@@ -1,4 +1,4 @@
-const DAYS = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag'];
+const DAYS = ['Vrijdag', 'Zaterdag', 'Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag'];
 const MEALS = ['ontbijt', 'snack1', 'lunch', 'snack2', 'diner', 'snack3'];
 const CATEGORIES = ['ontbijt', 'lunch', 'diner', 'snack', 'dessert'];
 const MEAL_LABELS = { ontbijt: 'Ontbijt', snack1: 'Snack', lunch: 'Lunch', snack2: 'Snack', diner: 'Diner', snack3: 'Snack' };
@@ -116,8 +116,33 @@ function save() {
     syncTimer = setTimeout(saveToCloud, 1000);
 }
 
+function getCurrentFridayWeek() {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = day >= 5 ? day - 5 : day + 2;
+    const friday = new Date(now);
+    friday.setDate(now.getDate() - diff);
+    friday.setHours(0, 0, 0, 0);
+    return friday;
+}
+
+function getWeekFriday(offset) {
+    const base = getCurrentFridayWeek();
+    const d = new Date(base);
+    d.setDate(d.getDate() + offset * 7);
+    return d;
+}
+
+function formatDate(d) {
+    return `${d.getDate()}-${d.getMonth() + 1}`;
+}
+
 function getWeekKey() {
-    return `week_${state.weekOffset}`;
+    const friday = getWeekFriday(state.weekOffset);
+    const y = friday.getFullYear();
+    const m = String(friday.getMonth() + 1).padStart(2, '0');
+    const d = String(friday.getDate()).padStart(2, '0');
+    return `week_${y}-${m}-${d}`;
 }
 
 function getWeekMenu() {
@@ -181,14 +206,19 @@ document.getElementById('mobileMenuBtn').addEventListener('click', () => {
 function renderWeekMenu() {
     const grid = document.getElementById('weekmenuGrid');
     const menu = getWeekMenu();
-    const label = state.weekOffset === 0 ? 'Deze week' : state.weekOffset > 0 ? `+${state.weekOffset} weken` : `${state.weekOffset} weken`;
+    const friday = getWeekFriday(state.weekOffset);
+    const thursday = new Date(friday);
+    thursday.setDate(thursday.getDate() + 6);
+    const label = `${formatDate(friday)} - ${formatDate(thursday)}${state.weekOffset === 0 ? ' (deze week)' : ''}`;
     document.getElementById('weekLabel').textContent = label;
 
-    grid.innerHTML = DAYS.map(day => {
+    grid.innerHTML = DAYS.map((day, i) => {
         const dayMenu = menu[day] || {};
+        const dayDate = new Date(friday);
+        dayDate.setDate(dayDate.getDate() + i);
         return `<div class="day-card">
             <div class="day-card-header">
-                <h3>${day}</h3>
+                <h3>${day} <span class="day-date">${formatDate(dayDate)}</span></h3>
                 <div class="day-card-actions">
                     <button class="btn-day" onclick="copyDay('${day}')" title="Kopieer deze dag">📋</button>
                     <button class="btn-day" onclick="pasteDay('${day}')" title="Plak hier" id="paste-${day}" style="display:none">📌</button>
@@ -303,13 +333,12 @@ window.selectCustomMeal = function() {
     renderWeekMenu();
 };
 
+let viewingFromWeek = false;
+
 window.viewRecipe = function(id) {
     const recipe = state.recipes.find(r => r.id === id);
     if (!recipe) return;
-    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-    document.querySelector('[data-page="recepten"]').classList.add('active');
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.getElementById('page-recepten').classList.add('active');
+    viewingFromWeek = true;
     openRecipeModal(recipe);
 };
 
@@ -390,8 +419,19 @@ function openRecipeModal(recipe = null) {
 }
 
 document.getElementById('addRecipeBtn').addEventListener('click', () => openRecipeModal());
-document.getElementById('closeModal').addEventListener('click', () => document.getElementById('recipeModal').classList.remove('open'));
-document.getElementById('cancelRecipe').addEventListener('click', () => document.getElementById('recipeModal').classList.remove('open'));
+function closeRecipeModal() {
+    document.getElementById('recipeModal').classList.remove('open');
+    if (viewingFromWeek) {
+        viewingFromWeek = false;
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        document.querySelector('[data-page="weekmenu"]').classList.add('active');
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById('page-weekmenu').classList.add('active');
+    }
+}
+
+document.getElementById('closeModal').addEventListener('click', closeRecipeModal);
+document.getElementById('cancelRecipe').addEventListener('click', closeRecipeModal);
 
 window.editRecipe = function(id) {
     const recipe = state.recipes.find(r => r.id === id);
@@ -429,7 +469,7 @@ document.getElementById('recipeForm').addEventListener('submit', e => {
     }
 
     save();
-    document.getElementById('recipeModal').classList.remove('open');
+    closeRecipeModal();
     renderRecipes(document.getElementById('recipeSearch').value, activeFilter);
 });
 
