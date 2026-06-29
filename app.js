@@ -175,7 +175,7 @@ setInterval(async () => {
         const loaded = await loadFromCloud();
         if (loaded) renderAll();
     }
-}, 30000);
+}, 300000);
 
 // Refresh bij terugkomen naar tabblad
 document.addEventListener('visibilitychange', async () => {
