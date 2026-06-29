@@ -260,6 +260,12 @@ body {
     opacity: 1;
 }
 
+.btn-paste {
+    opacity: 1;
+    background: var(--primary-light);
+    border-radius: 6px;
+}
+
 .meal-slot {
     display: flex;
     justify-content: space-between;
