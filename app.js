@@ -38,6 +38,8 @@ let state = {
 
 let syncTimer = null;
 let isSyncing = false;
+let copiedDay = null;
+let copiedDayName = null;
 
 function getSaveData() {
     return {
@@ -286,9 +288,6 @@ window.selectMeal = function(recipeId) {
     document.getElementById('mealPickerModal').classList.remove('open');
     renderWeekMenu();
 };
-
-let copiedDay = null;
-let copiedDayName = null;
 
 window.copyDay = function(day) {
     const menu = getWeekMenu();
