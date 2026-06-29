@@ -617,6 +617,22 @@ function renderBar(label, value, target, unit, type) {
     </div>`;
 }
 
+function migrateOldWeeks() {
+    const oldKeys = Object.keys(state.weekmenu).filter(k => k.match(/^week_\d+$/));
+    if (!oldKeys.length) return;
+
+    const currentKey = getWeekKey();
+    oldKeys.forEach(key => {
+        const data = state.weekmenu[key];
+        const hasData = Object.values(data).some(day => Object.keys(day).length > 0);
+        if (hasData && !state.weekmenu[currentKey]) {
+            state.weekmenu[currentKey] = data;
+        }
+        delete state.weekmenu[key];
+    });
+    save();
+}
+
 // INIT
 async function init() {
     loadLocal();
@@ -625,9 +641,11 @@ async function init() {
 
     const cloudLoaded = await loadFromCloud();
     if (cloudLoaded) {
+        migrateOldWeeks();
         localStorage.setItem('bakje-geluk', JSON.stringify(getSaveData()));
         renderAll();
     } else if (state.recipes.length > 0) {
+        migrateOldWeeks();
         saveToCloud();
     }
 }
